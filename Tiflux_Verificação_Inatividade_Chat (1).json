@@ -1,0 +1,1780 @@
+{
+  "name": "Tiflux/Verificação_Inatividade_Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */5 6-14 * * 1-5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        336
+      ],
+      "id": "9cdaf79e-366e-43b5-b78a-b305681085d1",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://api.tiflux.com/api/v2/chats/in_attendance",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -576,
+        336
+      ],
+      "id": "c96af11e-56f1-406c-ad72-c64f447d60ac",
+      "name": "HTTP Request Chats Tiflux",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4DuCnwDWyfHK8Qw3",
+          "name": "Tiflux API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.responsible }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "object",
+                      "operation": "empty",
+                      "singleValue": true
+                    },
+                    "id": "43ec07b3-6b2e-4e79-9874-1b67abfd5db8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Chat Sem Atribuição"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f5942be8-8ff8-4c69-bec4-3fac59beceef",
+                    "leftValue": "={{ $json.updated_at }}",
+                    "rightValue": "={{ $json.last_client_message }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Aguardo Técnico "
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "604d5b7b-ca93-40ba-8947-6d12c876b5e8",
+                    "leftValue": "={{ $json.last_client_message }}",
+                    "rightValue": "={{ $json.updated_at }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Aguardando Cliente"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -160,
+        320
+      ],
+      "id": "dac7d3f3-45d3-4734-a3c7-4e5dc9fe40a7",
+      "name": "Estado Chat"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        624,
+        928
+      ],
+      "id": "7d32585a-f5cd-4a62-86ca-99dcaf0e8f1f",
+      "name": "Verificar Alerta Cliente",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3eb307b1-e1d2-4f60-99d7-f914586d9212",
+              "leftValue": "={{ $('Estado Chat').item.json.updated_at }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 35 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "93b3696b-8bb6-470c-9aae-9b4095c02215",
+              "leftValue": "={{ $json.client_response_alert_level }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        928
+      ],
+      "id": "b2f02832-80b9-4fdf-9cb4-88be1d780c00",
+      "name": "Alerta 2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "793e35a4-abc6-4823-a1f8-ebf524f9c50a",
+              "leftValue": "={{ $('Estado Chat').item.json.updated_at }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 25 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "8fe452fc-9e2f-4ed9-b66d-6d8db490aee8",
+              "leftValue": "={{ $node[\"Verificar Alerta Cliente\"].json[0]?.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        1152
+      ],
+      "id": "275d462e-723f-48f6-90c3-d9f8684e51cc",
+      "name": "Alerta 1"
+    },
+    {
+      "parameters": {
+        "tableId": "chat_monitoring",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "chat_id",
+              "fieldValue": "={{ $('HTTP Request Chats Tiflux').item.json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "awaiting_client"
+            },
+            {
+              "fieldId": "client_response_alert_level",
+              "fieldValue": "1"
+            },
+            {
+              "fieldId": "last_status_update_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Loop Over Items').item.json.client.name }}"
+            },
+            {
+              "fieldId": "requestor_name",
+              "fieldValue": "={{ $('Loop Over Items').item.json.requestor.name }}"
+            },
+            {
+              "fieldId": "responsible_name",
+              "fieldValue": "={{ $('Loop Over Items').item.json.responsible.name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        1136
+      ],
+      "id": "43989a75-8f84-43ac-a660-bf6b263fd8f2",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "be0f6fee-cfa6-4add-ad4d-bd064f2bd521",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "number"
+            },
+            {
+              "id": "2819d064-8633-4c9a-9b3c-77a125f39dc2",
+              "name": "last_client_message",
+              "value": "={{ $json.last_client_message }}",
+              "type": "string"
+            },
+            {
+              "id": "6ba2d356-6b97-4aa3-a54c-52b4ddd765f3",
+              "name": "updated_at",
+              "value": "={{ $json.updated_at }}",
+              "type": "string"
+            },
+            {
+              "id": "ed92ec9b-c553-49c6-93c2-b5200c9b15f4",
+              "name": "responsible",
+              "value": "={{ $json.responsible }}",
+              "type": "object"
+            },
+            {
+              "id": "532b7954-4cad-4a96-ab3b-1ed7a62f6184",
+              "name": "requestor",
+              "value": "={{ $json.requestor }}",
+              "type": "object"
+            },
+            {
+              "id": "bf854485-f05b-49b2-82d9-6cb5b3d6bce9",
+              "name": "client.name",
+              "value": "={{ $json.client?.name || $json.requestor?.name || $json.origin?.fields?.name }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -368,
+        336
+      ],
+      "id": "a5d14bb1-1f57-42f0-ad0a-b190e218c1fb",
+      "name": "Filtra Infos"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        368,
+        912
+      ],
+      "id": "4ca43ad2-eced-48b2-9615-6578f3090b90",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "client_response_alert_level",
+              "fieldValue": "2"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        912
+      ],
+      "id": "65c4e36d-5381-4e73-ba74-ee127833a77a",
+      "name": "Update a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "chat_monitoring",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "chat_id",
+              "fieldValue": "={{ $('HTTP Request Chats Tiflux').item.json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "awaiting_technician"
+            },
+            {
+              "fieldId": "agent_response_alert_level",
+              "fieldValue": "1"
+            },
+            {
+              "fieldId": "last_status_update_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Loop Over Items1').item.json.client.name }}"
+            },
+            {
+              "fieldId": "requestor_name",
+              "fieldValue": "={{ $('Loop Over Items1').item.json.requestor.name }}"
+            },
+            {
+              "fieldId": "responsible_name",
+              "fieldValue": "={{ $('Loop Over Items1').item.json.responsible.name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        560
+      ],
+      "id": "26f2f9b5-d825-4832-88ba-1c7506c608f8",
+      "name": "Create a row1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        368,
+        336
+      ],
+      "id": "c869cfcd-c564-4fe5-98f4-4921d747aeb6",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "agent_response_alert_level",
+              "fieldValue": "2"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        336
+      ],
+      "id": "64b6dd28-e39e-4fdc-b0cc-66aac6bec3a4",
+      "name": "Update a row1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        624,
+        352
+      ],
+      "id": "26f593cd-e303-4656-87bd-41cd63509c02",
+      "name": "Verificar Alerta Tecnico",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "793e35a4-abc6-4823-a1f8-ebf524f9c50a",
+              "leftValue": "={{ $('Estado Chat').item.json.last_client_message }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 25 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "c78fa87e-3eff-4403-8889-1dd312bfd91f",
+              "leftValue": "={{ $node[\"Verificar Alerta Tecnico\"].json[0]?.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        576
+      ],
+      "id": "45c3374e-7a58-40f8-b6b7-516b50ca5e7a",
+      "name": "Alerta 25min"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Cliente sem responder há {{ Math.round(DateTime.now().diff(DateTime.fromISO($('Loop Over Items').item.json.last_client_message), 'minutes').toObject().minutes) }} min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Alerta Crítico: Técnico Aguardando</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n    .email-container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }\n    .header { background-color: #00008B; padding: 20px; text-align: center; }\n    .main-content { background-color: #ffffff; padding: 40px 30px; text-align: center; }\n    .main-content h1 { font-size: 24px; color: #b30000; margin-top: 0; }\n    .main-content p { font-size: 16px; line-height: 1.6; color: #555555; }\n    .info-box { text-align: left; border: 1px solid #eeeeee; background-color: #f9f9f9; padding: 20px; margin: 30px auto; max-width: 90%; border-radius: 5px; }\n    .info-box p { margin: 8px 0; font-size: 15px; }\n    .button { background-color: #00008B; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 20px; }\n    .footer { background-color: #f7f7f7; color: #888888; padding: 20px; text-align: center; font-size: 12px; }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <tr><td class=\"header\"><img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; color: #ffffff;\"></td></tr>\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta Crítico: Técnico Aguardando</h1>\n                            <p>Este atendimento está sem resposta do cliente há mais de <strong>{{ Math.round(DateTime.now( ).diff(DateTime.fromISO($('Loop Over Items').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos.</p>\n                            <div class=\"info-box\">\n                                <p><strong>Técnico:</strong> {{ $json.responsible_name || 'Não atribuído' }}</p>\n                                <p><strong>Cliente:</strong> {{ $json.requestor_name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Verificar Atendimento</a>\n                        </td>\n                    </tr>\n                    <tr><td class=\"footer\"><p>Este é um e-mail automático. Por favor, não responda.</p></td></tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        912
+      ],
+      "id": "3c8b7cee-c6e9-4157-a4f9-864dfff91fa7",
+      "name": "Cria Variáveis Chat Sem Resposta do Cliente 55min"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Cliente sem responder há {{ Math.round(DateTime.now().diff(DateTime.fromISO($('Loop Over Items').item.json.last_client_message), 'minutes').toObject().minutes) }} min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Alerta: Técnico Aguardando Cliente</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n    .email-container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }\n    .header { background-color: #1E90FF; padding: 20px; text-align: center; }\n    .main-content { background-color: #ffffff; padding: 40px 30px; text-align: center; }\n    .main-content h1 { font-size: 24px; color: #166ab8; margin-top: 0; }\n    .main-content p { font-size: 16px; line-height: 1.6; color: #555555; }\n    .info-box { text-align: left; border: 1px solid #eeeeee; background-color: #f9f9f9; padding: 20px; margin: 30px auto; max-width: 90%; border-radius: 5px; }\n    .info-box p { margin: 8px 0; font-size: 15px; }\n    .button { background-color: #1E90FF; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 20px; }\n    .footer { background-color: #f7f7f7; color: #888888; padding: 20px; text-align: center; font-size: 12px; }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <tr><td class=\"header\"><img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; color: #ffffff;\"></td></tr>\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta: Técnico Aguardando Cliente</h1>\n                            <p>Um técnico está aguardando a resposta do cliente há <strong>{{ Math.round(DateTime.now().diff(DateTime.fromISO($('Loop Over Items').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos.</p>\n                            <div class=\"info-box\">\n                                <p><strong>Técnico:</strong> {{ $json.responsible_name || 'Não atribuído' }}</p>\n                                <p><strong>Cliente:</strong> {{ $json.requestor_name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Abrir Chats Ativos</a>\n                        </td>\n                    </tr>\n                    <tr><td class=\"footer\"><p>Este é um e-mail automático. Por favor, não responda.</p></td></tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1536,
+        1120
+      ],
+      "id": "9c9cf33c-a47e-40c9-9b81-9fbc61eb8b73",
+      "name": "Cria Variáveis Chat Sem Resposta do Cliente 25+"
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "=thais.goncalves@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1728,
+        1120
+      ],
+      "id": "7e2c648f-cc85-4ec1-9cae-779b0ae060d8",
+      "name": "Envia E-mail Chat sem Resposta do Cliente 25+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "=thais.goncalves@itease.com.br, marcus.reis@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        544
+      ],
+      "id": "08a581c2-b808-47ad-bbb6-e003056476dc",
+      "name": "Envia E-mail Chat sem Resposta do Tecnico 25+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "=thais.goncalves@itease.com.br, everton.scarton@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1488,
+        336
+      ],
+      "id": "622354e0-8c8b-4a76-81d5-849be50f661a",
+      "name": "Envia E-mail Chat sem Resposta do Tecnico 55+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Tecnico sem responder há {{ Math.round(DateTime.now().diff(DateTime.fromISO($('Loop Over Items1').item.json.last_client_message), 'minutes').toObject().minutes) }} min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Alerta Crítico: Cliente Aguardando</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n    .email-container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }\n    .header { background-color: #FF4500; padding: 20px; text-align: center; }\n    .main-content { background-color: #ffffff; padding: 40px 30px; text-align: center; }\n    .main-content h1 { font-size: 24px; color: #cc3700; margin-top: 0; }\n    .main-content p { font-size: 16px; line-height: 1.6; color: #555555; }\n    .info-box { text-align: left; border: 1px solid #eeeeee; background-color: #f9f9f9; padding: 20px; margin: 30px auto; max-width: 90%; border-radius: 5px; }\n    .info-box p { margin: 8px 0; font-size: 15px; }\n    .button { background-color: #FF4500; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 20px; }\n    .footer { background-color: #f7f7f7; color: #888888; padding: 20px; text-align: center; font-size: 12px; }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <tr><td class=\"header\"><img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; color: #ffffff;\"></td></tr>\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta Crítico: Cliente Aguardando</h1>\n                            <p>Este cliente está aguardando resposta há um tempo considerável de <strong>{{ Math.round(DateTime.now(  ).diff(DateTime.fromISO($('Loop Over Items1').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos.</p>\n                            <div class=\"info-box\">\n                                <p><strong>Técnico:</strong> {{ $('Loop Over Items1').item.json.responsible.name || 'Não atribuído' }}</p>\n                                <p><strong>Cliente:</strong> {{ $('Loop Over Items1').item.json.requestor.name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $('Alerta 35min').item.json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Verificar Atendimento Urgente</a>\n                        </td>\n                    </tr>\n                    <tr><td class=\"footer\"><p>Este é um e-mail automático. Por favor, não responda.</p></td></tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1296,
+        336
+      ],
+      "id": "431173d6-8eed-4593-99ea-442a94eca2ee",
+      "name": "Cria Variáveis Chat Sem Resposta do Tecnico 55+"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Cliente sem responder há {{ Math.round((new Date() - new Date($json.last_client_message)) / 60000) }} min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Alerta: Cliente Aguardando Resposta</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n    .email-container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }\n    .header { background-color: #FFA500; padding: 20px; text-align: center; }\n    .main-content { background-color: #ffffff; padding: 40px 30px; text-align: center; }\n    .main-content h1 { font-size: 24px; color: #cc8400; margin-top: 0; }\n    .main-content p { font-size: 16px; line-height: 1.6; color: #555555; }\n    .info-box { text-align: left; border: 1px solid #eeeeee; background-color: #f9f9f9; padding: 20px; margin: 30px auto; max-width: 90%; border-radius: 5px; }\n    .info-box p { margin: 8px 0; font-size: 15px; }\n    .button { background-color: #FFA500; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 20px; }\n    .footer { background-color: #f7f7f7; color: #888888; padding: 20px; text-align: center; font-size: 12px; }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <tr><td class=\"header\"><img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; color: #ffffff;\"></td></tr>\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta: Cliente Aguardando Resposta</h1>\n                            <p>Um cliente está aguardando a resposta de um técnico há <strong>{{ Math.round(DateTime.now( ).diff(DateTime.fromISO($('Loop Over Items1').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos.</p>\n                            <div class=\"info-box\">\n                                <p><strong>Técnico:</strong> {{ $json.responsible_name || 'Não atribuído' }}</p>\n                                <p><strong>Cliente:</strong> {{ $json.requestor_name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Abrir Chats Ativos</a>\n                        </td>\n                    </tr>\n                    <tr><td class=\"footer\"><p>Este é um e-mail automático. Por favor, não responda.</p></td></tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        544
+      ],
+      "id": "ded3a72f-77eb-4184-95a9-4c25b3b234a0",
+      "name": "Cria Variáveis Chat Sem Resposta do Tecnico 25+"
+    },
+    {
+      "parameters": {
+        "tableId": "chat_monitoring",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "chat_id",
+              "fieldValue": "={{ $('HTTP Request Chats Tiflux').item.json.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "awaiting_new_technician"
+            },
+            {
+              "fieldId": "unassigned_alert_level",
+              "fieldValue": "1"
+            },
+            {
+              "fieldId": "last_status_update_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Loop Over Items2').item.json.client.name }}"
+            },
+            {
+              "fieldId": "requestor_name",
+              "fieldValue": "={{ $('Loop Over Items2').item.json.requestor.name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1312,
+        -32
+      ],
+      "id": "4eff5277-51eb-40f2-a0f8-cd9470256699",
+      "name": "Create a row2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        368,
+        -256
+      ],
+      "id": "84d6ad18-9913-4af1-bcab-fe87ab26b9f2",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.chat_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "unassigned_alert_level",
+              "fieldValue": "2"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        -256
+      ],
+      "id": "21297598-79e8-49aa-a211-07c7fa2704a7",
+      "name": "Update a row2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "chat_monitoring",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        624,
+        -240
+      ],
+      "id": "fdba5892-6337-466e-a035-2ad054c064af",
+      "name": "Verificar Alerta Sem Tecnico",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "793e35a4-abc6-4823-a1f8-ebf524f9c50a",
+              "leftValue": "={{ $('Estado Chat').item.json.last_client_message }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 25 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "c78fa87e-3eff-4403-8889-1dd312bfd91f",
+              "leftValue": "={{ $('Verificar Alerta Sem Tecnico').item.json.unassigned_alert_level }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        -16
+      ],
+      "id": "09338d67-9756-4a3f-85ff-7b4c640ed838",
+      "name": "Alerta 25min sem Tecnico"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Novo Cliente sem atendimento há {{ Math.round(DateTime.now(  ).diff(DateTime.fromISO($('Loop Over Items2').item.json.last_client_message), 'minutes').toObject().minutes) }}min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">\n<title>Alerta: Chat Aguardando Atendimento</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n\n    .email-container {\n        max-width: 600px;\n        margin: 0 auto;\n        font-family: Arial, sans-serif;\n        /* Sombra adicionada para dar profundidade */\n        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1 );\n        border-radius: 8px; /* Bordas arredondadas para um visual mais moderno */\n        overflow: hidden; /* Garante que a sombra não vaze para dentro */\n    }\n    .header {\n        background-color: #696969; /* Cinza escurecido (DimGray), conforme solicitado */\n        padding: 20px;\n        text-align: center;\n    }\n    .main-content {\n        background-color: #ffffff;\n        padding: 40px 30px;\n        text-align: center;\n    }\n    .main-content h1 {\n        font-size: 24px;\n        color: #333333; /* Cor do título ajustada para melhor contraste */\n        margin-top: 0;\n    }\n    .main-content p {\n        font-size: 16px;\n        line-height: 1.6;\n        color: #555555;\n    }\n    .info-box {\n        text-align: left;\n        border: 1px solid #eeeeee;\n        background-color: #f9f9f9;\n        padding: 20px;\n        margin: 30px auto;\n        max-width: 90%;\n        border-radius: 5px;\n    }\n    .info-box p {\n        margin: 8px 0;\n        font-size: 15px;\n    }\n    .button {\n        background-color: #696969; /* Cor do botão igual ao cabeçalho */\n        color: #ffffff;\n        padding: 15px 30px;\n        text-decoration: none;\n        border-radius: 5px;\n        display: inline-block;\n        font-weight: bold;\n        margin-top: 20px;\n    }\n    .footer {\n        background-color: #f7f7f7;\n        color: #888888;\n        padding: 20px;\n        text-align: center;\n        font-size: 12px;\n    }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <!-- CABEÇALHO -->\n                    <tr>\n                        <td class=\"header\">\n                            <img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; font-family: Arial, sans-serif; font-size: 16px; color: #ffffff; font-weight: bold;\">\n                        </td>\n                    </tr>\n\n                    <!-- CONTEÚDO PRINCIPAL -->\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta: Chat Aguardando Atendimento</h1>\n                            <p>\n                                Um novo cliente iniciou um chat e aguarda o primeiro atendimento há <strong>{{ Math.round(DateTime.now(   ).diff(DateTime.fromISO($('Loop Over Items2').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos.\n                            </p>\n                            \n                            <div class=\"info-box\">\n                                <p><strong>Cliente:</strong> {{ $json.requestor_name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n\n                            <!-- BOTÃO DE AÇÃO -->\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Atender Cliente</a>\n                        </td>\n                    </tr>\n\n                    <!-- RODAPÉ -->\n                    <tr>\n                        <td class=\"footer\">\n                            <p>Este é um e-mail automático. Por favor, não responda.</p>\n                        </td>\n                    </tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1568,
+        32
+      ],
+      "id": "46bb2b2d-ea8e-4107-b9d4-6bc0ee71e7b5",
+      "name": "Cria Variáveis Chat Sem Tecnico 25+"
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "=thais.goncalves@itease.com.br,marcus.reis@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        32
+      ],
+      "id": "f99a4c10-2194-49dc-a2e2-d596a2df7699",
+      "name": "Envia E-mail Chat sem Tecnico 25+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8f89529b-edd8-4627-8711-7885b4b71d4f",
+              "name": "titulo_notificacao",
+              "value": "=Tecnico sem responder há {{ Math.round(DateTime.now().diff(DateTime.fromISO($('Loop Over Items2').item.json.last_client_message), 'minutes').toObject().minutes) }} min - Ticket #{{ $json.ticket?.number || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "4097030d-3eb0-4707-a1ce-8798032a9f3e",
+              "name": "corpo_notificacao",
+              "value": "=<!DOCTYPE html>\n<html lang=\"pt-br\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Alerta Crítico: Chat na Fila</title>\n<style>\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }\n    table { border-collapse: collapse !important; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f0f2f5; }\n    .email-container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden; }\n    .header { background-color: #000000; padding: 20px; text-align: center; }\n    .main-content { background-color: #ffffff; padding: 40px 30px; text-align: center; }\n    .main-content h1 { font-size: 24px; color: #b30000; margin-top: 0; }\n    .main-content p { font-size: 16px; line-height: 1.6; color: #555555; }\n    .info-box { text-align: left; border: 1px solid #eeeeee; background-color: #f9f9f9; padding: 20px; margin: 30px auto; max-width: 90%; border-radius: 5px; }\n    .info-box p { margin: 8px 0; font-size: 15px; }\n    .button { background-color: #000000; color: #ffffff; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; margin-top: 20px; }\n    .footer { background-color: #f7f7f7; color: #888888; padding: 20px; text-align: center; font-size: 12px; }\n</style>\n</head>\n<body style=\"margin: 0 !important; padding: 0 !important; background-color: #f0f2f5;\">\n    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n        <tr>\n            <td align=\"center\" style=\"padding: 20px;\">\n                <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\">\n                    <tr><td class=\"header\"><img src=\"https://itease-my.sharepoint.com/personal/thais_goncalves_itease_com_br/_layouts/15/download.aspx?share=EVYX0OKxmmBFpzy-60P7No4BO-ihG50iFeuOl37PMMthxw\" width=\"180\" alt=\"Logo ITEASE\" style=\"display: block; border: 0; color: #ffffff;\"></td></tr>\n                    <tr>\n                        <td class=\"main-content\">\n                            <h1>Alerta Crítico: Chat na Fila</h1>\n                            <p>Este cliente está na fila há mais de <strong>{{ Math.round(DateTime.now(   ).diff(DateTime.fromISO($('Loop Over Items2').item.json.last_client_message), 'minutes').toObject().minutes) }}</strong> minutos sem atendimento!</p>\n                            <div class=\"info-box\">\n                                <p><strong>Cliente:</strong> {{ $json.requestor_name || 'Não identificado' }}</p>\n                                <p><strong>Empresa:</strong> {{ $json.company_name || 'Não identificada' }}</p>\n                                <p><strong>Ticket:</strong> </p>\n                            </div>\n                            <a href=\"https://app.tiflux.com/v/chats\" class=\"button\" target=\"_blank\">Atendimento Urgente</a>\n                        </td>\n                    </tr>\n                    <tr><td class=\"footer\"><p>Este é um e-mail automático. Por favor, não responda.</p></td></tr>\n                </table>\n            </td>\n        </tr>\n    </table>\n</body>\n</html>\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        -256
+      ],
+      "id": "9de46942-838b-4df9-9121-8687394d54a0",
+      "name": "Cria Variáveis Chat Sem Tecnico 55+"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -608,
+        928
+      ],
+      "id": "3978655e-c482-4dc9-a7d7-ba03d7d500ce",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "chat_monitoring",
+        "filterType": "string",
+        "filterString": "id=not.is.null"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        928
+      ],
+      "id": "4dd18826-2dd5-4fdd-b1b6-502bb5313c51",
+      "name": "Delete a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "lzQLPzfafRfXEtM0",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3eb307b1-e1d2-4f60-99d7-f914586d9212",
+              "leftValue": "={{ $('Estado Chat').item.json.last_client_message }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 35 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "93b3696b-8bb6-470c-9aae-9b4095c02215",
+              "leftValue": "={{ $json.unassigned_alert_level }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        -240
+      ],
+      "id": "8208375d-02ef-453c-95d5-4035c7f4fe8e",
+      "name": "Alerta 35min sem Tecnico"
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "= thais.goncalves@itease.com.br, everton.scarton@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1472,
+        -256
+      ],
+      "id": "5a5eece1-0025-405c-b4d9-4a9276e9f749",
+      "name": "Envia E-mail Chat sem Tecnico 35+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3eb307b1-e1d2-4f60-99d7-f914586d9212",
+              "leftValue": "={{ $('Estado Chat').item.json.last_client_message }}",
+              "rightValue": "={{ DateTime.now().minus({ minutes: 35 }) }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "93b3696b-8bb6-470c-9aae-9b4095c02215",
+              "leftValue": "={{ $json.agent_response_alert_level }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        352
+      ],
+      "id": "3354e050-95f7-4e21-bbc3-b761d54873e4",
+      "name": "Alerta 35min"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 432,
+        "width": 448,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -656,
+        688
+      ],
+      "typeVersion": 1,
+      "id": "5d627835-05ab-48b9-9d08-48d1d32a0d2d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 528,
+        "width": 1664,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "c4b11619-d432-4268-9b9f-a07f5443a35e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 464,
+        "width": 976,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -896,
+        80
+      ],
+      "typeVersion": 1,
+      "id": "6790c8a8-01d2-47e3-8d47-8e082d5a98b9",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 528,
+        "width": 1664,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        288
+      ],
+      "typeVersion": 1,
+      "id": "aca8a350-fa8a-4dad-96e3-e03d6af4c734",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 528,
+        "width": 1664,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        864
+      ],
+      "typeVersion": 1,
+      "id": "708c7bab-7514-4ce0-b438-cdf2bd2eb459",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "fromEmail": "testeitease488@gmail.com",
+        "toEmail": "=thais.goncalves@itease.com.br",
+        "subject": "={{ $json.titulo_notificacao }}",
+        "html": "={{ $json.corpo_notificacao }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1488,
+        912
+      ],
+      "id": "1d5c398c-3e56-4be4-9f39-2a6fe8a3a94f",
+      "name": "Envia E-mail Chat sem Resposta do Cliente 35+",
+      "webhookId": "36115061-64bb-4ea2-8c44-00292cc5b0de",
+      "credentials": {
+        "smtp": {
+          "id": "uL0IJTXM6hMteM7r",
+          "name": "SMTP account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request Chats Tiflux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request Chats Tiflux": {
+      "main": [
+        [
+          {
+            "node": "Filtra Infos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estado Chat": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Alerta Cliente": {
+      "main": [
+        [
+          {
+            "node": "Alerta 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 2": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alerta 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 1": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtra Infos": {
+      "main": [
+        [
+          {
+            "node": "Estado Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Verificar Alerta Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Resposta do Cliente 25+",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Resposta do Cliente 55min",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row1": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Resposta do Tecnico 25+",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Verificar Alerta Tecnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row1": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Resposta do Tecnico 55+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Alerta Tecnico": {
+      "main": [
+        [
+          {
+            "node": "Alerta 35min",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 25min": {
+      "main": [
+        [
+          {
+            "node": "Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Resposta do Cliente 55min": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Resposta do Cliente 35+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Resposta do Cliente 25+": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Resposta do Cliente 25+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Resposta do Cliente 25+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Resposta do Tecnico 25+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Resposta do Tecnico 55+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Resposta do Tecnico 55+": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Resposta do Tecnico 55+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Resposta do Tecnico 25+": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Resposta do Tecnico 25+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row2": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Tecnico 25+",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Verificar Alerta Sem Tecnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row2": {
+      "main": [
+        [
+          {
+            "node": "Cria Variáveis Chat Sem Tecnico 55+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Alerta Sem Tecnico": {
+      "main": [
+        [
+          {
+            "node": "Alerta 35min sem Tecnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 25min sem Tecnico": {
+      "main": [
+        [
+          {
+            "node": "Create a row2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Tecnico 25+": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Tecnico 25+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Tecnico 25+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cria Variáveis Chat Sem Tecnico 55+": {
+      "main": [
+        [
+          {
+            "node": "Envia E-mail Chat sem Tecnico 35+",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Delete a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 35min sem Tecnico": {
+      "main": [
+        [
+          {
+            "node": "Update a row2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alerta 25min sem Tecnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Tecnico 35+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alerta 35min": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alerta 25min",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia E-mail Chat sem Resposta do Cliente 35+": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a5a20632-8154-4783-a31f-34b6b2165be2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "185ba077e1c7b20c2b36283e5c616bb88d4b39bfffda32bf938f85eecc433603"
+  },
+  "id": "BxMIemjd8Ita2kTw",
+  "tags": []
+}
