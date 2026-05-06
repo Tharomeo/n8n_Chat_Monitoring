@@ -1,65 +1,140 @@
-# 💬 Monitoramento e Alerta de Inatividade de Chats (n8n/Tiflux)
+<table>
+  <tr>
+    <td><img src="https://img.icons8.com/fluency/64/chat.png" width="60"/></td>
+    <td><h1>Chat Inactivity Monitor</h1></td>
+  </tr>
+</table>
+
+> Automated inactivity detection for support chats — triggers escalating email alerts when clients, technicians, or assignments are left unattended.
+
+![n8n](https://img.shields.io/badge/n8n-EA4B71?style=for-the-badge&logo=n8n&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Status](https://img.shields.io/badge/Status-Active-28a745?style=for-the-badge)
 
 ---
 
-Este repositório contém o **workflow de automação** desenvolvido em **n8n** (o arquivo JSON) que implementa um **Sistema de Monitoramento em Tempo Real** para o fluxo de atendimento da plataforma **Tiflux**.
+## 📌 About
 
-O objetivo principal é garantir a **alta qualidade** e a **rapidez nas respostas**, notificando automaticamente a equipe sobre chats inativos e não atribuídos, visando a melhoria do **SLA** e **FRT**.
+This workflow continuously monitors open support chats and detects inactivity based on who is expected to respond. It tracks three distinct scenarios and sends escalating email alerts at 25 and 35 minutes of inactivity — escalating from management to directors to ensure no ticket is left unattended.
 
-## 🚀 Funcionalidades Principais
-
-O workflow opera em um ciclo contínuo, monitorando, classificando e escalando problemas de atendimento de forma robusta.
-
-### 1. Detecção e Classificação de Inatividade 🔍
-
-O sistema executa uma verificação **a cada 5 minutos** durante o horário de trabalho e classifica o estado de cada chat (via nó `Switch`), direcionando-o para a ação de alerta correta:
-
-* **Estado Sem Atribuição:** Clientes novos aguardando o primeiro contato de um técnico.
-* **Estado Aguardando Técnico:** Cliente respondeu, e o técnico está demorando a dar a próxima resposta.
-* **Estado Aguardando Cliente:** Técnico respondeu, aguardando o retorno do cliente (monitoramento para *follow-up* ou encerramento).
-
-### 2. Escalonamento Automático e Inteligente 📧
-
-O sistema utiliza a base de dados para implementar um sistema de alerta com dois níveis, evitando *spam* e garantindo que apenas os **chats críticos** sejam escalados:
-
-* **Alerta 1 (Aviso):** Disparado após **25 minutos** de inatividade.
-* **Alerta 2 (Crítico):** Disparado após **35 minutos** de inatividade (escala para gestão).
-    > 💡 **Mecanismo Anti-Spam:** Uma tabela em **Supabase (PostgreSQL)** registra o status de alerta (`level 1` ou `level 2`) de cada chat. O sistema consulta esta tabela antes de enviar um novo e-mail, impedindo a duplicação de alertas.
-
-### 3. Arquitetura de Integração e Log ✨
-
-O projeto é *low-code* e altamente conectado, garantindo a persistência e a lógica dos dados:
-
-* **Integração API:** Conexão direta com a **API Tiflux** para coleta de dados em tempo real.
-* **Base de Logs:** Utilização do **Supabase/PostgreSQL** para registrar o status, o nível de alerta e os *logs* de monitoramento.
-* **Limpeza Diária:** Um `Schedule Trigger` separado executa a limpeza da base de logs todos os dias às 5h da manhã.
+Alert history is persisted in Supabase to avoid duplicate notifications.
 
 ---
 
-## 🛠️ Como Utilizar
+## ✨ Features
 
-### Requisitos
-* Instância ativa do **n8n**.
-* Credenciais de API configuradas para:
-    * **Tiflux API Key** (Leitura de chats).
-    * **Supabase/PostgreSQL** (Tabela `chat_monitoring`).
-    * **SMTP** (Envio de E-mail).
-
-### Execução
-1.  Importe o arquivo JSON do workflow (`Tiflux/Verificação_Inatividade_Chat.json`) para sua instância do n8n.
-2.  Preencha as credenciais nos nós correspondentes.
-3.  Ative o workflow.
-
-### Fluxo de Uso
-1.  O `Schedule Trigger` inicia a execução (configurado a **cada 5 minutos, das 6h às 14h**).
-2.  O nó `HTTP Request` coleta todos os chats em atendimento do Tiflux.
-3.  O nó `Estado Chat` (Switch) direciona cada chat para o *loop* de monitoramento apropriado (Técnico, Cliente ou Sem Atribuição).
-4.  O fluxo verifica o tempo de inatividade e o status de alerta no Supabase, disparando a notificação por e-mail, se necessário.
+- 🔁 **Scheduled polling** — runs automatically at regular intervals
+- 👤 **Client inactivity detection** — alerts when a client hasn't replied
+- 🧑‍💻 **Technician inactivity detection** — alerts when a technician hasn't responded
+- 🚨 **Unassigned chat detection** — alerts when no technician has been assigned
+- ⏱️ **Escalating alerts** — first alert to management at 25 min, escalated to directors at 35 min
+- 🔔 **Duplicate prevention** — Supabase tracks which alerts have already been sent
+- 🧹 **Automatic cleanup** — closed chats are removed from the tracking database
 
 ---
 
-## 🎯 Objetivo
+## 🔄 How it works
 
-Esta automação é essencial para **gestores de atendimento** e **times de suporte técnico** que precisam de um utilitário robusto para monitorar e escalar rapidamente problemas de inatividade, garantindo que nenhum cliente seja negligenciado e que o SLA seja cumprido.
+```
+Schedule Trigger
+      │
+      ▼
+Fetch all open chats (HTTP Request)
+      │
+      ▼
+Loop over each chat
+      │
+      ▼
+Identify chat state
+      │
+      ├── Waiting for CLIENT response
+      │         │
+      │   Check alert history (Supabase)
+      │         ├── 25 min → Alert to Management
+      │         └── 35 min → Escalate to Board / Directors
+      │
+      ├── Waiting for TECHNICIAN response
+      │         │
+      │   Check alert history (Supabase)
+      │         ├── 25 min → Alert to Management
+      │         └── 35 min → Escalate to Board / Directors
+      │
+      └── NO TECHNICIAN assigned
+                │
+          Check alert history (Supabase)
+                ├── 25 min → Alert to Management
+                └── 35 min → Escalate to Board / Directors
+```
 
-> **⚠️ Importante:** Este workflow requer credenciais ativas e um ambiente de banco de dados (Supabase/PostgreSQL) configurado para persistência de dados.
+A second scheduled trigger runs periodically to **clean up resolved chats** from the Supabase tracking table.
+
+---
+
+## 📧 Alert Levels
+
+| Time | Escalation | Recipients |
+|---|---|---|
+| **25 min** | ⚠️ First warning | Management |
+| **35 min** | 🔴 Final escalation | Board / Directors |
+
+Each scenario sends a specific email with context about the chat, making it easy to act immediately.
+
+---
+
+## 🗄️ Database
+
+Alert state is tracked in **Supabase** to prevent duplicate notifications. One table per scenario, each storing the chat ID and the highest alert level already sent.
+
+| Column | Description |
+|---|---|
+| `chat_id` | Identifier of the monitored chat |
+| `alert_level` | Highest alert already sent (1 = management, 2 = directors) |
+| `created_at` | Timestamp of the first alert |
+
+Records are automatically deleted when the chat is resolved or closed.
+
+---
+
+## 🛠️ Stack
+
+| Tool | Role |
+|---|---|
+| **n8n** | Workflow automation engine |
+| **Support platform API** | Fetch open chats via HTTP |
+| **Supabase** | Alert history and deduplication |
+| **SMTP / Resend** | Email alert delivery |
+
+---
+
+## 🚀 Setup
+
+**1. Import the workflow into your n8n instance**
+
+- `Chat_Inactivity_Monitor.json`
+
+**2. Configure credentials in n8n**
+
+- `HTTP Request` — add your support platform API key
+- `Supabase` — connect your Supabase project
+- `SMTP` — configure your email sender
+
+**3. Create the tracking tables in Supabase**
+
+```sql
+-- One table per scenario (client / technician / unassigned)
+create table chat_alerts (
+  id uuid primary key default gen_random_uuid(),
+  chat_id text,
+  alert_level int,
+  created_at timestamptz default now()
+);
+```
+
+**4. Activate the workflow**
+
+<div align="center">
+
+![built with n8n](https://img.shields.io/badge/Built_with-n8n-EA4B71?style=flat-square&logo=n8n&logoColor=white)
+
+</div>
